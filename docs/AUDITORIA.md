@@ -22,6 +22,7 @@ verificación que no se pudo hacer acá**: el build real de la imagen y el arran
 | # | Hallazgo | Estado |
 |---|---|---|
 | C1 | El `.env.example` traía `JWT_SECRET=dev-secret-change-me`. Copiado al server, el harness arranca **y da 401 en silencio** en la pestaña (el síntoma parece "está roto"). | **Corregido**. El valor queda **vacío** y el api **falla al arrancar** con mensaje accionable; además se rechaza explícitamente el valor de ejemplo. Verificado en 3 casos reales (vacío → error; ejemplo → error; real → emite token). |
+| C2 | La migración inicial (`0001_init/migration.sql`) tenía un **BOM** (`EF BB BF`) al inicio del archivo. Postgres falla con `syntax error at or near "\uFEFF"` y **el contenedor queda en bucle de arranque** (P3018). Habría roto el primer `docker compose up` en el server. | **Corregido** (se removió el BOM y se verificó que los primeros bytes sean `2D 2D 20`). **Lo atrapó el E2E**, no el typecheck ni los tests: es un problema de bytes, no de código. Barrido del repo: era el único archivo con BOM. |
 
 ### Altos — funcionales
 
@@ -88,11 +89,36 @@ Comparado 1:1 con `social-harness`:
 resuelve bien `DATABASE_URL` en cada caso (`atiende-postgres` en server,
 `docharnes-postgres` en local), el volumen `/data`, el puerto 3300 y `QUEUE_PREFIX`.
 
-## Falta verificar (fuera de mi alcance acá)
+## Verificación E2E (hecha, sobre el stack real)
 
-1. **Build real de la imagen + arranque E2E** (Docker Desktop estaba apagado):
-   `docker compose up -d --build` y `curl /api/health`.
-2. **Generación con la llave real de DeepSeek** (se probó el flujo en modo `mock`).
+`docker compose -f docker-compose.yml -f docker-compose.infra.yml up -d --build` sobre una
+**base vacía** (Postgres local recién creado) y con **Redis compartida**. Resultado:
+**17/17 en verde**:
+
+| Prueba | Resultado |
+|---|---|
+| `GET /api/health` | `status=ok db=up llm=mock` |
+| `GET /api/norms` | `icontc, apa7, ieee, custom` |
+| Subir PDF real (200 KB) | extraído, **8.700 caracteres** |
+| Job REESCRIBIR → PDF + DOCX | `DONE`; descargas `%PDF` (12.075 B) y `PK` DOCX (14.150 B) |
+| `GET /jobs/:id/preview` | PDF válido (12.075 B) |
+| Anonimizar: `scan` | 5 entidades detectadas |
+| Anonimizar: `apply` | el correo original **ya no aparece** |
+| Subir CSV → EDITAR EXCEL → XLSX | `DONE`; descarga `PK` (6.664 B) |
+| GENERAR DESDE PLANTILLA (ICONTEC) | `DONE`; PDF (2.052 B) |
+| XLSX en una operación de documento | **400** (validación nueva) |
+| `GET /api/usage` | responde |
+
+Además, el arranque fue **auto-recuperable**: el primer boot falló por el BOM (C2) y, tras
+corregir el archivo, el propio `recover-migrations` limpió el intento fallido y migró de
+nuevo — sin ningún paso manual.
+
+## Falta verificar
+
+1. **Generación con la llave real de DeepSeek** (todo el E2E corrió en modo `mock`:
+   sin IA real, los jobs usan el respaldo determinístico). El cableado del proveedor está
+   verificado por `llm:check` y por el adaptador, pero la calidad de la generación real
+   queda para cuando pongas la llave.
 
 Los pasos exactos están en `docs/NEXT-SESSION.md`.
 

@@ -118,12 +118,22 @@ Detalle completo en `docs/AUDITORIA.md`. Las aplicadas al código:
 - `.xls`/`.doc` (formato viejo no soportado) se rechazan al subir.
 - `.data` fuera de git y de la imagen.
 - `templateId` inexistente → `400` en vez de ignorarse.
+- **BOM en `migrations/0001_init/migration.sql`** (lo atrapó el E2E): Postgres fallaba con
+  `syntax error at or near "\uFEFF"` y el contenedor quedaba en bucle. Se removió; era el
+  único archivo del repo con BOM.
+
+## E2E sobre el stack real (2026-10-02)
+
+`docker compose ... up -d --build` sobre **base vacía** + Redis compartida → **17/17 OK**:
+health, normas, subir PDF real (8.700 caracteres), REESCRIBIR a PDF+DOCX (descargas válidas
+`%PDF`/`PK`), preview, anonimizar (5 entidades, el correo desaparece), CSV→EXCEL_EDIT→XLSX,
+GENERAR DESDE PLANTILLA (ICONTEC), y el `400` de XLSX en una operación de documento.
 
 ## Límites conocidos
 
-- **No verificado todavía**: arranque completo del stack con Docker (Docker Desktop no
-  estaba corriendo durante el desarrollo) y generación con la llave real de DeepSeek
-  (se probó el flujo en modo `mock`, que devuelve el respaldo determinístico).
+- **Pendiente de verificar**: la generación con la **llave real de DeepSeek** (todo el E2E
+  corrió en modo `mock`, con el respaldo determinístico). El resto del flujo está verificado
+  end-to-end sobre el stack real.
 - **Fidelidad al original**: para un documento subido se prioriza el contenido y la
   norma; no se replica el diseño exacto del original.
 - **Sin TOC automática** en PDF (ver ADR-001).

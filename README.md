@@ -150,7 +150,7 @@ salvo `/api/health`.
 
 Ver `docs/AUDITORIA.md` (auditoría de robustez y deploy), `docs/IMPLEMENTADO.md`
 (inventario y evidencia) y `docs/NEXT-SESSION.md` (pendientes). Resumen: backend compila
-y pasa **11 tests**; los tres formatos se generan válidos; la extracción de PDF real está
-verificada (8.700 caracteres de un PDF de prueba); los compose están validados en modo
-server y local. Falta probar el **arranque completo con Docker** y la generación con la
-llave real de DeepSeek.
+y pasa **11 tests**; los compose están validados en modo server y local; y el **E2E sobre
+el stack real pasó 17/17** (arranque sobre base vacía, subir un PDF, reescribir y descargar
+PDF/DOCX, anonimizar, editar Excel y generar con norma ICONTEC). Falta probar la generación
+con la **llave real de DeepSeek** (el E2E corrió en modo `mock`).

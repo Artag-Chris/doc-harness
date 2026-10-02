@@ -20,7 +20,7 @@ Detalle y evidencia: `docs/IMPLEMENTADO.md`.
 
 ## Pasos exactos que faltan
 
-### 1. Arrancar el stack real (bloqueado: Docker Desktop estaba apagado)
+### 1. Arrancar el stack real ✅ (hecho el 2026-10-02, 17/17 E2E)
 
 ```bash
 cd doc-harness
@@ -34,7 +34,7 @@ curl http://localhost:3300/api/health     # esperado: {"status":"ok","db":"up",.
 Si la red `microservices-network` no existe:
 `docker network create microservices-network`.
 
-### 2. Probar el flujo E2E
+### 2. Probar el flujo E2E ✅ (hecho)
 
 1. En el dashboard (`NEXT_PUBLIC_DOCS_API_URL=http://localhost:3300/api`, puerto 3001):
    pestaña **Documentos → Nuevo documento**.
