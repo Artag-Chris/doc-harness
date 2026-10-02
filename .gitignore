@@ -1,0 +1,26 @@
+node_modules/
+dist/
+coverage/
+*.log
+
+# Entorno real: nunca se commitea (los secretos viven solo acá).
+.env
+.env.local
+.env.*.local
+apps/api/.env
+
+# Excepción: los .env.example SÍ se trackean (checklist para el server).
+!.env.example
+!apps/api/.env.example
+
+# Prisma
+apps/api/prisma/*.db
+
+# Archivos generados/subidos (viven en el volumen, no en el repo).
+data/
+
+# SO / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

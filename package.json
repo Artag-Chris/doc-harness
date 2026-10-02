@@ -1,0 +1,18 @@
+{
+  "name": "doc-harness",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Harness personal: subís un documento, la IA lo reescribe/anonimiza/convierte y lo descargás en Word, PDF o Excel — sin cuentas externas",
+  "scripts": {
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:ps": "docker compose ps",
+    "docker:rebuild": "docker compose up -d --build",
+    "docker:infra:up": "docker compose -f docker-compose.yml -f docker-compose.infra.yml up -d postgres",
+    "docker:infra:down": "docker compose -f docker-compose.yml -f docker-compose.infra.yml stop postgres",
+    "docker:up:local": "docker compose -f docker-compose.yml -f docker-compose.infra.yml up -d --build",
+    "docker:down:local": "docker compose -f docker-compose.yml -f docker-compose.infra.yml down",
+    "seed": "docker compose exec api npx ts-node prisma/seed.ts"
+  }
+}

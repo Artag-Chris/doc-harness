@@ -1,0 +1,187 @@
+// Doc Harness — esquema de datos
+// Postgres del server: el MISMO de atiende, con la base "docharnes" propia
+// (la crea prisma/ensure-database.ts antes de `migrate deploy`).
+//
+// Nota de diseño (misma regla que social-harness): los valores que cambian
+// seguido —la NORMA de formato y el tipo de plantilla— se guardan como TEXTO
+// validado contra un catálogo en código (modules/format/norms.catalog.ts), NO
+// como enum de Postgres. Sumar una norma (o quitarla) es una entrada en el
+// catálogo, sin migración.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enums del dominio
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Tipo de archivo (se deduce del mime/extensión al subir).
+enum FileKind {
+  PDF
+  DOCX
+  XLSX
+  CSV
+  TXT
+  MD
+}
+
+/// Formato de salida de un artefacto.
+enum DocFormat {
+  PDF
+  DOCX
+  XLSX
+}
+
+/// Qué transformación pide el usuario. Cada operación tiene su propio armado de
+/// prompt, pero TODAS terminan en el mismo modelo de contenido (o de workbook).
+enum DocOperation {
+  REWRITE
+  ANONYMIZE
+  FROM_TEMPLATE
+  CONVERT
+  EXCEL_EDIT
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  DONE
+  ERROR
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Entrada: el archivo que sube el usuario.
+// ─────────────────────────────────────────────────────────────────────────────
+model SourceFile {
+  id String @id @default(cuid())
+
+  /// Identidad de atiende (claims `sub`/`businessId` del JWT compartido).
+  ownerId    String?
+  businessId String?
+
+  filename   String
+  mime       String
+  sizeBytes  Int
+  kind       FileKind
+  /// Ruta lógica dentro del StoragePort (no es una ruta absoluta del host).
+  storageKey String
+
+  /// Texto extraído del archivo. Es lo que se le pasa a la IA y lo que se
+  /// muestra como vista previa. `null` cuando el formato no es textual (xlsx).
+  extractedText String? @db.Text
+  /// Estructura extraída para no volver a parsear (p. ej. { sheets: [...] } de un Excel).
+  meta          Json    @default("{}")
+
+  createdAt DateTime @default(now())
+
+  jobs DocJob[] @relation("JobSources")
+
+  @@index([ownerId, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Trabajo: una transformación pedida (subir → IA → editar → render → descargar).
+// ─────────────────────────────────────────────────────────────────────────────
+model DocJob {
+  id String @id @default(cuid())
+
+  ownerId    String?
+  businessId String?
+
+  operation DocOperation
+  status    JobStatus    @default(QUEUED)
+
+  /// Instrucción libre del usuario ("hazlo más formal", "traducí a inglés").
+  instruction String? @db.Text
+
+  /// Formato(s) destino elegidos en el wizard.
+  targetFormats DocFormat[] @default([])
+  /// Clave de norma del catálogo (icontc | apa7 | ieee | custom). null = ninguna.
+  norm       String?
+  templateId String?
+
+  /// DocContent estructurado (bloques). Fuente de verdad del editor y de los
+  /// renderers docx/pdf. Se guarda como JSON para poder editarlo por bloques sin
+  /// volver a llamar a la IA.
+  content Json?
+  /// WorkbookContent (hojas) cuando el destino es Excel.
+  workbook Json?
+
+  error String? @db.Text
+  /// true = el usuario editó el contenido: re-renderizar no debe pisarlo.
+  editedByUser Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sourceFiles SourceFile[]  @relation("JobSources")
+  artifacts   DocArtifact[]
+
+  @@index([ownerId, createdAt])
+  @@index([status])
+}
+
+/// Un archivo renderizado (uno por formato destino).
+model DocArtifact {
+  id         String    @id @default(cuid())
+  jobId      String
+  format     DocFormat
+  storageKey String
+  filename   String
+  sizeBytes  Int
+  createdAt  DateTime  @default(now())
+
+  job DocJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Plantillas propias: sobreescriben/afinan una norma (márgenes, fuente, portada,
+// membrete, logo). `kind` y `norm` son texto validado en la frontera con Zod.
+// ─────────────────────────────────────────────────────────────────────────────
+model DocumentTemplate {
+  id String @id @default(cuid())
+
+  ownerId    String?
+  businessId String?
+
+  name     String
+  /// pdf | docx
+  kind     String
+  /// Norma base opcional del catálogo (icontc | apa7 | ieee | custom).
+  norm     String?
+  /// FormatSpec parcial: { pageSize, margins, font, cover, letterhead, logoKey }.
+  spec     Json   @default("{}")
+  builtin  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Medidor de gasto de IA: sin esto no se puede responder "¿cuánto me cuesta?".
+// ─────────────────────────────────────────────────────────────────────────────
+model AiUsage {
+  id String @id @default(cuid())
+
+  ownerId String?
+  job     String
+  model   String?
+  tokensIn  Int   @default(0)
+  tokensOut Int   @default(0)
+  costUsd   Float @default(0)
+  latencyMs Int   @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}

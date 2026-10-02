@@ -1,0 +1,66 @@
+# Infraestructura LOCAL de doc-harness (postgres propio para dev).
+# En el server NO se usa: ahí ya corren la Redis compartida y el Postgres de atiende.
+#
+# ⚠️ Este archivo NO se puede usar SOLO: el bloque `api` de abajo es un OVERRIDE
+# del servicio definido en docker-compose.yml (no tiene build propio), así que
+# compose lo rechaza si se pasa el archivo suelto. Siempre se usa combinado:
+#
+#   Levantar solo el postgres:   npm run docker:infra:up   →  up -d postgres
+#   Stack completo:              npm run docker:up:local
+#   Apagar:                      npm run docker:infra:down
+#
+# ── REUTILIZA la infra compartida que ya corre en la máquina ─────────────────
+# Redis: NO se levanta acá. Se usa el MISMO contenedor `redis` (redis:7-alpine)
+# de la red `microservices-network` que ya usan atiende y cv-harness. Si no existe:
+#   docker run -d --name redis --network microservices-network redis:7-alpine
+#
+# Postgres: SÍ es propio (mismo patrón que los hermanos). Ojo con los nombres y
+# puertos, que no choquen: atiende 5433 · cvharness 5434 · socialharness 5435 ·
+# docharnes 5436.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: docharnes-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: docharnes
+      POSTGRES_PASSWORD: docharnes
+      POSTGRES_DB: docharnes
+    ports:
+      - "${POSTGRES_PORT:-5436}:5432"
+    volumes:
+      - docharnes_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docharnes -d docharnes"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - microservices-network
+
+  # Override LOCAL del servicio api (se usa con -f docker-compose.infra.yml):
+  # apunta la API al postgres local + la Redis compartida.
+  api:
+    environment:
+      DATABASE_URL: postgresql://docharnes:docharnes@docharnes-postgres:5432/docharnes?schema=public
+      DATABASE_HOST: docharnes-postgres
+      POSTGRES_USER: docharnes
+      POSTGRES_PASSWORD: docharnes
+      POSTGRES_DB: docharnes
+      # Redis COMPARTIDA (el contenedor `redis` que ya existe en la red).
+      REDIS_URL: redis://redis:6379
+      REDIS_HOST: redis
+      # Solo en local: plantilla de ejemplo. En el server no se define.
+      SEED_DEMO: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  docharnes_pgdata:
+    name: docharnes_pgdata
+
+networks:
+  microservices-network:
+    external: true
