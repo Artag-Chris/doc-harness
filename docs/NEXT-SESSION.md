@@ -74,6 +74,6 @@ Verificar con `docker compose exec api npm run llm:check` y repetir el paso 2.
 - **TOC automática** en PDF: evaluar si conviene cambiar el `PdfRenderer` por
   HTML+Chromium detrás del mismo `RenderPort` (ver `docs/adr-001`).
 - **Plantillas HTML** para la portada/membrete, si "estilo propio" se queda corto.
-- **Bug preexistente del dashboard**: `next build` falla en `/social/comunidad`
-  (prerender, `useState` nulo). No es de esta pestaña, pero conviene arreglarlo para
-  poder desplegar el front.
+- **Dashboard**: no hay nada pendiente — `next build` pasa (30/30) y `tsc` da 0
+  errores. Ojo al buildear a mano: **NO fuerces `NODE_ENV=development`** (rompe el
+  prerender de las páginas con hooks); dejá que Next lo maneje, como Vercel.

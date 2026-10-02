@@ -89,9 +89,9 @@ Luego, en el dashboard: pestaña **Documentos → Nuevo documento**.
   También verificado con un segundo PDF real (2.778 caracteres).
 - **PDF generado**: se validó la tabla xref del PDF producido por pdfkit (13/13 offsets
   apuntan a su objeto y `startxref` coincide) → archivo estructuralmente válido.
-- **Front**: `tsc --noEmit` sobre el `dashboard/` sin errores propios (los 2 errores
-  que aparecen son de `.next/types` generado y **preexistentes**: se reprodujeron con
-  `git stash` de mis cambios).
+- **Front**: `npm run build` del `dashboard/` pasa (30/30 páginas, con `/docs`,
+  `/docs/[id]`, `/docs/nuevo` y `/docs/plantillas` en la tabla de rutas) y
+  `tsc --noEmit` da **0 errores**.
 
 ## Bugs encontrados y resueltos durante la implementación
 
@@ -127,5 +127,9 @@ Detalle completo en `docs/AUDITORIA.md`. Las aplicadas al código:
 - **Fidelidad al original**: para un documento subido se prioriza el contenido y la
   norma; no se replica el diseño exacto del original.
 - **Sin TOC automática** en PDF (ver ADR-001).
-- **El build de Next del `dashboard/`** falla por un problema preexistente en
-  `/social/comunidad` (prerender, `useState` nulo), ajeno a esta pestaña.
+- **Gotcha al buildear el front a mano**: NO fuerces `NODE_ENV=development` en
+  `next build`. Next avisa "non-standard NODE_ENV" y el prerender revienta con
+  `Cannot read properties of null (reading 'useState')` en las páginas con hooks
+  (p. ej. `/social/comunidad`). Se builda como lo hace Vercel: **dejar que Next
+  maneje `NODE_ENV`** (el host lo tiene en `production`). Verificado: con
+  `NODE_ENV` estándar el build pasa 30/30.
