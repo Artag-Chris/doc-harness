@@ -55,15 +55,8 @@ async function bootstrap(): Promise<void> {
     jsonDocumentUrl: 'api/docs-json',
   });
 
-  if (env.JWT_SECRET === 'dev-secret-change-me') {
-    logger.warn(
-      {
-        msg: 'JWT_SECRET está en el valor por defecto: el dashboard de atiende dará 401 en la pestaña Documentos.',
-        fix: 'Copiá el JWT_SECRET real de atiende en doc-harness/.env y recreá el contenedor api.',
-      },
-      'Bootstrap',
-    );
-  }
+  // Nota: no hay aviso de "JWT_SECRET por defecto" porque ese caso ya no llega
+  // acá — `env.ts` rechaza el valor de ejemplo (y el vacío) al arrancar.
 
   if (env.llmMode === 'mock') {
     logger.warn(

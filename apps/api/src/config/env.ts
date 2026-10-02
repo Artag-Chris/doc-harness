@@ -14,6 +14,13 @@ import { resolveDatabaseUrl } from './database-url';
  *    arrancar con mock silencioso (el `superRefine` de abajo).
  */
 
+/**
+ * Valor de ejemplo que NUNCA debe llegar a un despliegue: el harness valida el
+ * JWT que emite atiende, así que un secreto de ejemplo daría 401 en el dashboard
+ * sin decir por qué. Se rechaza explícitamente en el `superRefine`.
+ */
+export const DEV_JWT_SECRET = 'dev-secret-change-me';
+
 const boolFromEnv = (defaultValue: 'true' | 'false') =>
   z
     .enum(['true', 'false'])
@@ -86,7 +93,10 @@ const envSchema = z
     MAX_UPLOAD_MB: z.coerce.number().int().min(1).max(500).default(25),
 
     // ── Auth (JWT compartido con atiende) ─────────────────────────────────
-    JWT_SECRET: z.string().min(1).default('dev-secret-change-me'),
+    // Sin valor de ejemplo a propósito: vacío/ausente = el boot FALLA y lo dice,
+    // en vez de arrancar y dar 401 en silencio (el peor caso: parece que el
+    // harness está roto cuando en realidad falta copiar el secreto de atiende).
+    JWT_SECRET: z.string().min(1, 'Falta JWT_SECRET: es el MISMO de atiende.').default(''),
     JWT_EXPIRES_IN: z.string().default('1d'),
 
     // ── Demo ───────────────────────────────────────────────────────────────
@@ -108,6 +118,14 @@ const envSchema = z
     }
     if (usedAsLlm('groq') && value.GROQ_API_KEY.length === 0) {
       missing('GROQ_API_KEY', `Se pidió groq (${where}) pero GROQ_API_KEY está vacía.`);
+    }
+
+    if (value.JWT_SECRET === DEV_JWT_SECRET) {
+      missing(
+        'JWT_SECRET',
+        'Es el valor de ejemplo. Copiá el JWT_SECRET REAL de atiende ' +
+          '(`docker exec <atiende> printenv JWT_SECRET`): con el de ejemplo el dashboard da 401.',
+      );
     }
   });
 

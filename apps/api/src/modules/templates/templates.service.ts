@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import type { DocumentTemplate } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AccessScope } from '../auth/access-scope.service';
@@ -21,9 +21,13 @@ export class TemplatesService {
   }
 
   async get(user: AuthPayload, id: string): Promise<DocumentTemplate> {
-    // Las plantillas `builtin` (sin dueño) son visibles para todos.
+    // Las plantillas de fábrica (`builtin`) son visibles para todos; el resto,
+    // solo para su dueño (o para un SUPER_ADMIN, que ve todo).
     const found = await this.prisma.documentTemplate.findFirst({
-      where: { id, OR: [{ ownerId: user.sub }, { builtin: true }, ...(this.scope.isGlobal(user) ? [{}] : [])] },
+      where: {
+        id,
+        ...(this.scope.isGlobal(user) ? {} : { OR: [{ ownerId: user.sub }, { builtin: true }] }),
+      },
     });
     if (!found) throw new NotFoundException(`La plantilla ${id} no existe.`);
     return found;
@@ -42,7 +46,14 @@ export class TemplatesService {
   }
 
   async update(user: AuthPayload, id: string, input: UpdateTemplateInput): Promise<DocumentTemplate> {
-    await this.get(user, id);
+    const template = await this.get(user, id);
+    // Una plantilla de fábrica es compartida: editarla cambiaría el layout de
+    // todos. Se duplica si se quiere una propia.
+    if (template.builtin) {
+      throw new ForbiddenException(
+        'Las plantillas de fábrica son de solo lectura: creá una propia con los mismos valores.',
+      );
+    }
     return this.prisma.documentTemplate.update({
       where: { id },
       data: {

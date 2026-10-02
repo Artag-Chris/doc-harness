@@ -45,7 +45,20 @@ export class SourcesService {
       );
     }
 
-    const { text, meta } = await this.extract.extract(kind, file.buffer);
+    // Un archivo corrupto o ilegible es un error DEL USUARIO (400 con motivo), no
+    // un 500 genérico: sin esto, un PDF roto se veía como "error interno".
+    let extracted: Awaited<ReturnType<ExtractService['extract']>>;
+    try {
+      extracted = await this.extract.extract(kind, file.buffer);
+    } catch (error) {
+      throw new BadRequestException(
+        `No se pudo leer "${file.originalname}": ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    const { text, meta } = extracted;
+
     const created = await this.prisma.sourceFile.create({
       data: {
         ...this.scope.ownership(user),

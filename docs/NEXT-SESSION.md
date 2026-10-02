@@ -54,11 +54,16 @@ Verificar con `docker compose exec api npm run llm:check` y repetir el paso 2.
 
 ### 4. Deploy al server
 
-1. `git init -b main` + `git remote add origin https://github.com/Artag-Chris/doc-harness.git`.
-2. Copiar el `.env` al server con: `JWT_SECRET` = el de `atiende`,
+> El repo ya está creado en GitHub (`Artag-Chris/doc-harness`, rama `main`) con el commit
+> inicial pusheado. En el server: `git pull` + `docker compose up -d --build`.
+
+1. Copiar el `.env` al server con: `JWT_SECRET` = **el de `atiende`** (obligatorio: si
+   queda vacío o con el valor de ejemplo, el api **no arranca** y lo dice),
    `DEEPSEEK_API_KEY`/`DEEPSEEK_MODEL`, `CORS_ALLOWED_ORIGINS` con el dominio del
    dashboard, `API_PORT=3300`, `POSTGRES_DB=docharnes`, `QUEUE_PREFIX=docharnes`.
-3. `docker compose up -d --build`.
+2. `docker compose up -d --build`.
+3. Si ya tenías el contenedor arriba y cambiaste el `.env`:
+   `docker compose up -d --force-recreate api` (un `restart` no relee el `.env`).
 4. En Vercel, agregar `NEXT_PUBLIC_DOCS_API_URL=https://<dominio>/api` y **redesplegar**
    (las `NEXT_PUBLIC_*` se hornean en el build).
 

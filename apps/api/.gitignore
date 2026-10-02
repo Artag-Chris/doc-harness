@@ -3,3 +3,5 @@ dist/
 coverage/
 *.log
 .env
+# Almacenamiento local (cuando el api corre fuera de docker: DOCS_STORAGE_DIR=./.data).
+.data/

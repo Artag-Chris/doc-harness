@@ -142,11 +142,15 @@ salvo `/api/health`.
   reescritura del modelo.
 - **Infraestructura compartida.** Mismo Postgres y Redis que los otros harnesses,
   diferenciado por base, `QUEUE_PREFIX` y puertos (3300/5436).
+- **Falla ruidoso antes que fallar en silencio.** Si `JWT_SECRET` falta o es el valor de
+  ejemplo, el api **no arranca** con un mensaje accionable: arrancar con un secreto
+  distinto al de atiende daría 401 en el dashboard y parecería que el harness está roto.
 
 ## Estado y límites conocidos
 
-Ver `docs/IMPLEMENTADO.md` (inventario y evidencia) y `docs/NEXT-SESSION.md`
-(pendientes). Resumen: backend compila y pasa 9 tests; los tres formatos se generan
-válidos; la extracción de PDF real está verificada (8.700 caracteres de un PDF de
-prueba). Falta probar el arranque completo con Docker y la generación con la llave
-real de DeepSeek.
+Ver `docs/AUDITORIA.md` (auditoría de robustez y deploy), `docs/IMPLEMENTADO.md`
+(inventario y evidencia) y `docs/NEXT-SESSION.md` (pendientes). Resumen: backend compila
+y pasa **11 tests**; los tres formatos se generan válidos; la extracción de PDF real está
+verificada (8.700 caracteres de un PDF de prueba); los compose están validados en modo
+server y local. Falta probar el **arranque completo con Docker** y la generación con la
+llave real de DeepSeek.

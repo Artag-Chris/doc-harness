@@ -76,12 +76,13 @@ Luego, en el dashboard: pestaña **Documentos → Nuevo documento**.
 
 ## Evidencia de verificación (corrida real)
 
-- **`npm run check`** → 0 errores de TypeScript y **9/9 tests** en verde:
+- **`npm run check`** → 0 errores de TypeScript y **11/11 tests** en verde:
   - `test/render.spec.ts` (5): PDF con firma `%PDF` y >1 KB **para las 4 normas**;
     DOCX y XLSX como contenedor ZIP (`PK`) válido; error explícito si falta contenido;
     catálogo de normas correcto (APA 7 con doble espacio, IEEE con secciones numeradas).
-  - `test/extract.spec.ts` (4): detección de tipo por extensión/mime; TXT; Excel
-    round-trip (`Nombre/Edad`, 2 filas, vista previa TSV); PDF inválido falla limpio.
+  - `test/extract.spec.ts` (6): detección de tipo por extensión/mime; TXT; DOCX
+    round-trip con `docx`+`mammoth`; CSV a planilla; Excel round-trip (`Nombre/Edad`,
+    2 filas, vista previa TSV); PDF inválido falla limpio.
 - **`npm run build`** (Nest) → compila sin errores.
 - **`npm run extract:check -- Christian_Resume.pdf`** → `Tipo: PDF · 200.023 bytes · 191 ms
   · Texto extraído: 8.700 caracteres`, con muestra legible (correo, teléfono, cargos).
@@ -103,6 +104,20 @@ Luego, en el dashboard: pestaña **Documentos → Nuevo documento**.
   `createRequire` y la verificación real se movió a `scripts/extract-check.ts`.
 - Los errores de render (contenido faltante) ahora son explícitos en vez de producir
   un archivo vacío.
+
+### Correcciones de la auditoría (2026-10-02)
+
+Detalle completo en `docs/AUDITORIA.md`. Las aplicadas al código:
+
+- `JWT_SECRET` de ejemplo en el `.env.example` → ahora el api **falla al arrancar** con
+  el vacío o con `dev-secret-change-me` (antes: 401 silencioso en el dashboard).
+- Formatos de salida validados contra la operación (antes: se omitían en silencio).
+- Se borran los artefactos viejos al re-renderizar con menos formatos.
+- Archivo ilegible → `400` con motivo (antes: `500` genérico).
+- Plantillas de fábrica de solo lectura; visibilidad explícita.
+- `.xls`/`.doc` (formato viejo no soportado) se rechazan al subir.
+- `.data` fuera de git y de la imagen.
+- `templateId` inexistente → `400` en vez de ignorarse.
 
 ## Límites conocidos
 

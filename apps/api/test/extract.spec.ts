@@ -1,4 +1,5 @@
 import { FileKind } from '@prisma/client';
+import { Document, Packer, Paragraph, TextRun } from 'docx';
 import ExcelJS from 'exceljs';
 import { describe, expect, it } from 'vitest';
 import { ExtractService } from '../src/modules/extract/extract.service';
@@ -15,6 +16,21 @@ async function buildXlsx(): Promise<Buffer> {
   sheet.addRow(['Ana', 30]);
   sheet.addRow(['Luis', 25]);
   return Buffer.from((await workbook.xlsx.writeBuffer()) as ArrayBuffer);
+}
+
+/** .docx real en memoria (librería `docx`) para probar la extracción con mammoth. */
+async function buildDocx(): Promise<Buffer> {
+  const document = new Document({
+    sections: [
+      {
+        children: [
+          new Paragraph({ children: [new TextRun('Informe de prueba en Word')] }),
+          new Paragraph({ children: [new TextRun('Segundo párrafo con contenido')] }),
+        ],
+      },
+    ],
+  });
+  return Packer.toBuffer(document);
 }
 
 /**
@@ -60,6 +76,22 @@ describe('extracción', () => {
   it('extrae texto plano de un TXT', async () => {
     const result = await extract.extract(FileKind.TXT, Buffer.from('hola mundo', 'utf8'));
     expect(result.text).toBe('hola mundo');
+  });
+
+  it('extrae el texto de un DOCX (round-trip con la librería docx)', async () => {
+    const buffer = await buildDocx();
+    const result = await extract.extract(FileKind.DOCX, buffer);
+    expect(result.text).toContain('Informe de prueba en Word');
+    expect(result.text).toContain('Segundo párrafo con contenido');
+  });
+
+  it('extrae un CSV a la misma estructura de planilla que un Excel', async () => {
+    const buffer = Buffer.from('Nombre,Edad\nAna,30\nLuis,25\n', 'utf8');
+    const result = await extract.extract(FileKind.CSV, buffer);
+    const workbook = result.meta.workbook as WorkbookContent;
+    expect(workbook.sheets[0].columns).toEqual(['Nombre', 'Edad']);
+    expect(workbook.sheets[0].rows).toHaveLength(2);
+    expect(String(workbook.sheets[0].rows[1][0])).toBe('Luis');
   });
 
   it('extrae la estructura de un Excel (hojas, columnas y filas)', async () => {

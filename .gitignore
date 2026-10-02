@@ -18,6 +18,7 @@ apps/api/prisma/*.db
 
 # Archivos generados/subidos (viven en el volumen, no en el repo).
 data/
+.data/
 
 # SO / editor
 .DS_Store

@@ -68,12 +68,11 @@ export class JobsService {
       throw new BadRequestException('Para generar desde plantilla escribí una instrucción o subí material.');
     }
 
-    const targetFormats =
-      input.targetFormats.length > 0
-        ? input.targetFormats
-        : input.operation === DocOperation.EXCEL_EDIT
-          ? [DocFormat.XLSX]
-          : [DocFormat.PDF];
+    const targetFormats = this.assertFormats(input.operation, input.targetFormats);
+
+    if (input.templateId) {
+      await this.assertTemplate(user, input.templateId);
+    }
 
     const job = await this.prisma.docJob.create({
       data: {
@@ -135,10 +134,13 @@ export class JobsService {
 
   async queueRender(user: AuthPayload, id: string, input: RenderInput): Promise<DocJob> {
     await this.scope.assertJob(user, id);
+    const current = await this.prisma.docJob.findUniqueOrThrow({ where: { id } });
+    const targetFormats = this.assertFormats(current.operation, input.targetFormats);
+
     const job = await this.prisma.docJob.update({
       where: { id },
       data: {
-        targetFormats: input.targetFormats,
+        targetFormats,
         ...(input.norm !== undefined ? { norm: input.norm } : {}),
         ...(input.templateId !== undefined ? { templateId: input.templateId } : {}),
         status: JobStatus.RUNNING,
@@ -293,6 +295,10 @@ export class JobsService {
       const content = job.content ? DocContentSchema.parse(job.content) : undefined;
       const workbook = job.workbook ? WorkbookContentSchema.parse(job.workbook) : undefined;
 
+      // Al re-renderizar con MENOS formatos, se borran los artefactos viejos que ya
+      // no se piden: si no, quedaban descargables y confundían.
+      await this.dropArtifactsOutside(job.id, job.targetFormats);
+
       for (const format of job.targetFormats) {
         if ((format === DocFormat.XLSX && !workbook) || (format !== DocFormat.XLSX && !content)) {
           this.logger.warn(
@@ -346,6 +352,50 @@ export class JobsService {
       data: { status: JobStatus.RUNNING, error: null },
     });
     await this.renderQueue.add('render', { jobId: job.id }, JOB_OPTIONS);
+  }
+
+  /**
+   * Coherencia operación ↔ formatos de salida. Un Excel editado solo sale en
+   * .xlsx; el resto, solo en PDF/Word. Antes, elegir Excel en una operación de
+   * documento producía un render OMITIDO EN SILENCIO (solo un log).
+   */
+  private assertFormats(operation: DocOperation, requested: DocFormat[]): DocFormat[] {
+    const allowed: DocFormat[] =
+      operation === DocOperation.EXCEL_EDIT ? [DocFormat.XLSX] : [DocFormat.PDF, DocFormat.DOCX];
+
+    const invalid = requested.filter((format) => !allowed.includes(format));
+    if (invalid.length > 0) {
+      throw new BadRequestException(
+        `La operación ${operation} no genera ${invalid.join(', ')}. Formatos válidos: ${allowed.join(', ')}.`,
+      );
+    }
+
+    return requested.length > 0 ? [...new Set(requested)] : [allowed[0]];
+  }
+
+  /** La plantilla tiene que existir y ser alcanzable (propia, de fábrica o global). */
+  private async assertTemplate(user: AuthPayload, templateId: string): Promise<void> {
+    const found = await this.prisma.documentTemplate.findFirst({
+      where: {
+        id: templateId,
+        ...(this.scope.isGlobal(user) ? {} : { OR: [{ ownerId: user.sub }, { builtin: true }] }),
+      },
+      select: { id: true },
+    });
+    if (!found) throw new BadRequestException('La plantilla no existe o no es tuya.');
+  }
+
+  /** Borra los artefactos (fila + archivo) de los formatos que ya no se piden. */
+  private async dropArtifactsOutside(jobId: string, keep: DocFormat[]): Promise<void> {
+    const stale = (Object.values(DocFormat) as DocFormat[]).filter(
+      (format) => !keep.includes(format),
+    );
+    if (stale.length === 0) return;
+
+    for (const format of stale) {
+      await this.storage.remove(`artifacts/${jobId}/${format}.${FORMAT_EXTENSION[format]}`);
+    }
+    await this.prisma.docArtifact.deleteMany({ where: { jobId, format: { in: stale } } });
   }
 
   private async resolveSpec(job: DocJob): Promise<FormatSpec> {
